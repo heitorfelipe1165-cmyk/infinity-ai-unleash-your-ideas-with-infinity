@@ -319,6 +319,29 @@ function ChatPage() {
         )}
 
         <div className="relative border-t border-border px-4 py-4">
+          <div className="mx-auto max-w-3xl">
+            {attachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachments.map((src, i) => (
+                  <div key={i} className="relative">
+                    <img
+                      src={src}
+                      alt={`Anexo ${i + 1}`}
+                      className="h-20 w-20 rounded-xl border border-border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground hover:text-foreground"
+                      aria-label="Remover imagem"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -326,9 +349,40 @@ function ChatPage() {
             }}
             className="glow-ring glow-ring-hover mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-input bg-surface p-2 focus-within:border-neon"
           >
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? []);
+                files.forEach((file) => void addImage(file));
+                event.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="glow-ring glow-ring-hover flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground hover:text-neon"
+              aria-label="Anexar imagem"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onPaste={(event) => {
+                const items = Array.from(event.clipboardData?.items ?? []);
+                const images = items
+                  .filter((item) => item.type.startsWith("image/"))
+                  .map((item) => item.getAsFile())
+                  .filter((file): file is File => file !== null);
+                if (images.length > 0) {
+                  event.preventDefault();
+                  images.forEach((file) => void addImage(file));
+                }
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -336,12 +390,12 @@ function ChatPage() {
                 }
               }}
               rows={1}
-              placeholder="Peça qualquer coisa à Infinity AI..."
+              placeholder="Peça qualquer coisa à Infinity AI ou cole uma imagem (Ctrl+V)..."
               className="scrollbar-slim max-h-40 min-h-11 w-full resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
             />
             <button
               type="submit"
-              disabled={streaming || !input.trim()}
+              disabled={streaming || (!input.trim() && attachments.length === 0)}
               className="glow-ring bg-gradient-neon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary-foreground hover:shadow-[0_0_24px_-6px_var(--violet)] disabled:opacity-50"
             >
               {streaming ? (
