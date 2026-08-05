@@ -154,7 +154,9 @@ function Paywall() {
               <p className="mt-4 text-xs font-medium text-muted-foreground">
                 Chave PIX (Copia e Cola)
               </p>
-              <p className="mt-2 break-all font-mono text-sm text-neon">{PIX_KEY}</p>
+              <p className="scrollbar-slim mt-2 max-h-32 overflow-y-auto break-all rounded-lg border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-neon">
+                {PIX_KEY}
+              </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   onClick={copyPix}
