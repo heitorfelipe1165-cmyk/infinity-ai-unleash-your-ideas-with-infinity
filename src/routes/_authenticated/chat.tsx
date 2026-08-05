@@ -110,11 +110,12 @@ function ChatPage() {
     navigate({ to: "/auth", replace: true });
   }
 
-  async function send(text: string) {
+  async function send(text: string, imgs: string[] = attachments) {
     const prompt = text.trim();
-    if (!prompt || streaming) return;
+    if ((!prompt && imgs.length === 0) || streaming) return;
 
     setInput("");
+    setAttachments([]);
     setShowHistory(false);
     const userId = account.data?.userId;
     if (!userId) return;
@@ -123,7 +124,7 @@ function ChatPage() {
     if (!chatId) {
       const { data, error } = await supabase
         .from("chats")
-        .insert({ user_id: userId, title: prompt.slice(0, 120) })
+        .insert({ user_id: userId, title: (prompt || "Imagem enviada").slice(0, 120) })
         .select("id, title, created_at")
         .single();
       if (error || !data) {
@@ -135,13 +136,19 @@ function ChatPage() {
       setChats((prev) => [data, ...prev]);
     }
 
-    const history = [...messages, { role: "user" as const, content: prompt }];
+    const history = [
+      ...messages,
+      { role: "user" as const, content: prompt, ...(imgs.length ? { images: imgs } : {}) },
+    ];
     setMessages([...history, { role: "assistant", content: "" }]);
     setStreaming(true);
 
-    await supabase
-      .from("messages")
-      .insert({ chat_id: chatId, user_id: userId, role: "user", content: prompt });
+    await supabase.from("messages").insert({
+      chat_id: chatId,
+      user_id: userId,
+      role: "user",
+      content: prompt || "[imagem enviada]",
+    });
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
