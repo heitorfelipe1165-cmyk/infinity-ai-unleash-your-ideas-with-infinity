@@ -45,6 +45,7 @@ function Paywall() {
   const queryClient = useQueryClient();
   const fetchAccount = useServerFn(getAccountState);
   const submitRequest = useServerFn(createPaymentRequest);
+  const confirmPix = useServerFn(finalizePayment);
 
   const [fullName, setFullName] = useState("");
   const [copied, setCopied] = useState(false);
@@ -56,12 +57,30 @@ function Paywall() {
   });
 
   const requestStatus = account.data?.requestStatus ?? null;
-  const approved = requestStatus === "approved";
+  const pixUnlocked = account.data?.pixUnlocked ?? false;
+  const banned = account.data?.isBanned ?? false;
 
   // Administradores vão direto ao chat. Clientes aprovados ficam aqui para ver a chave PIX.
   useEffect(() => {
     if (account.data?.isAdmin) navigate({ to: "/chat", replace: true });
   }, [account.data?.isAdmin, navigate]);
+
+  // Já liberou o chat: segue direto para a conversa.
+  useEffect(() => {
+    if (account.data?.hasAccess && !account.data.isAdmin) navigate({ to: "/chat", replace: true });
+  }, [account.data?.hasAccess, account.data?.isAdmin, navigate]);
+
+  // Conta suspensa: desloga na hora.
+  useEffect(() => {
+    if (!banned) return;
+    toast.error("Sua conta foi suspensa");
+    void (async () => {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await supabase.auth.signOut();
+      navigate({ to: "/auth", replace: true });
+    })();
+  }, [banned, navigate, queryClient]);
 
   // Atualiza a tela assim que o administrador aprovar a solicitação.
   useEffect(() => {
@@ -71,6 +90,9 @@ function Paywall() {
         "postgres_changes",
         { event: "*", schema: "public", table: "subscriptions" },
         () => queryClient.invalidateQueries({ queryKey: ["account"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () =>
+        queryClient.invalidateQueries({ queryKey: ["account"] }),
       )
       .subscribe();
     return () => {
@@ -87,6 +109,17 @@ function Paywall() {
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Não foi possível enviar"),
+  });
+
+  const release = useMutation({
+    mutationFn: () => confirmPix({ data: undefined }),
+    onSuccess: async () => {
+      toast.success("Pagamento confirmado! Chat liberado.");
+      await queryClient.invalidateQueries({ queryKey: ["account"] });
+      navigate({ to: "/chat", replace: true });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Não foi possível liberar o chat"),
   });
 
   async function copyPix() {
@@ -111,6 +144,7 @@ function Paywall() {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
+
 
   return (
     <main className="relative min-h-screen px-4 py-10">
