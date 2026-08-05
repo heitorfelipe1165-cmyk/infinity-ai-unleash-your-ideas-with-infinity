@@ -96,10 +96,30 @@ function ChatPage() {
     );
   }
 
+  async function addImage(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máximo 5 MB)");
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("read"));
+      reader.readAsDataURL(file);
+    }).catch(() => null);
+    if (!dataUrl) {
+      toast.error("Não foi possível ler a imagem");
+      return;
+    }
+    setAttachments((prev) => [...prev, dataUrl].slice(0, 4));
+  }
+
   function newChat() {
     setActiveChatId(null);
     setMessages([]);
     setInput("");
+    setAttachments([]);
     setShowHistory(false);
     setSidebarOpen(false);
   }
