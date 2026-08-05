@@ -10,6 +10,8 @@ export type AccountState = {
   fullName: string | null;
   isAdmin: boolean;
   subscriptionStatus: string;
+  /** Status da última solicitação de assinatura: null | pending | approved | rejected */
+  requestStatus: string | null;
   hasAccess: boolean;
 };
 
@@ -65,13 +67,25 @@ export const getAccountState = createServerFn({ method: "POST" })
 
     const isAdmin = (roles ?? []).some((r) => r.role === "admin");
 
+    const { data: lastRequest } = await supabaseAdmin
+      .from("subscriptions")
+      .select("status, name")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const requestStatus = lastRequest?.status ?? null;
+    if (!fullName && lastRequest?.name) fullName = lastRequest.name;
+
     return {
       userId,
       email,
       fullName,
       isAdmin,
       subscriptionStatus,
-      hasAccess: isAdmin || subscriptionStatus === "active",
+      requestStatus,
+      hasAccess: isAdmin || subscriptionStatus === "active" || requestStatus === "approved",
     };
   });
 
@@ -82,9 +96,9 @@ export const createPaymentRequest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const email = String((context.claims as { email?: string }).email ?? "").toLowerCase();
-    const { error } = await context.supabase.from("payment_requests").insert({
+    const { error } = await context.supabase.from("subscriptions").insert({
       user_id: context.userId,
-      full_name: data.fullName,
+      name: data.fullName,
       email,
       status: "pending",
     });
@@ -121,8 +135,8 @@ export const listPaymentRequests = createServerFn({ method: "POST" })
 
 
     const { data: requests, error } = await context.supabase
-      .from("payment_requests")
-      .select("id, user_id, full_name, email, status, created_at")
+      .from("subscriptions")
+      .select("id, user_id, name, email, status, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
@@ -132,8 +146,9 @@ export const listPaymentRequests = createServerFn({ method: "POST" })
 
     const statusById = new Map((profiles ?? []).map((p) => [p.id, p.subscription_status]));
 
-    return (requests ?? []).map((r) => ({
+    return (requests ?? []).map(({ name, ...r }) => ({
       ...r,
+      full_name: name,
       subscription_status: statusById.get(r.user_id) ?? "inactive",
     }));
   });
@@ -159,7 +174,7 @@ export const decidePaymentRequest = createServerFn({ method: "POST" })
 
 
     const { data: request, error } = await context.supabase
-      .from("payment_requests")
+      .from("subscriptions")
       .select("id, user_id")
       .eq("id", data.requestId)
       .single();
@@ -167,7 +182,7 @@ export const decidePaymentRequest = createServerFn({ method: "POST" })
 
     if (data.approve) {
       await context.supabase
-        .from("payment_requests")
+        .from("subscriptions")
         .update({ status: "approved" })
         .eq("id", request.id);
       await context.supabase
@@ -176,7 +191,7 @@ export const decidePaymentRequest = createServerFn({ method: "POST" })
         .eq("id", request.user_id);
     } else {
       await context.supabase
-        .from("payment_requests")
+        .from("subscriptions")
         .update({ status: "rejected" })
         .eq("id", request.id);
       await context.supabase
