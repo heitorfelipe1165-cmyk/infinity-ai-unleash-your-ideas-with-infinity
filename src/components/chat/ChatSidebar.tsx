@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Folder, Infinity as InfinityIcon, LogOut, MessageSquare, Plus, ShieldCheck } from "lucide-react";
+import {
+  Folder,
+  Infinity as InfinityIcon,
+  KeyRound,
+  LogOut,
+  MessageSquare,
+  Plus,
+  ShieldCheck,
+} from "lucide-react";
 
 export type ChatSummary = { id: string; title: string; created_at: string };
 
@@ -7,6 +15,7 @@ type Props = {
   chats: ChatSummary[];
   activeChatId: string | null;
   isAdmin: boolean;
+  showPix?: boolean;
   email: string;
   onNewChat: () => void;
   onOpenHistory: () => void;
@@ -18,6 +27,7 @@ export function ChatSidebar({
   chats,
   activeChatId,
   isAdmin,
+  showPix = false,
   email,
   onNewChat,
   onOpenHistory,
@@ -82,6 +92,15 @@ export function ChatSidebar({
             style={{ borderColor: "color-mix(in oklab, var(--violet) 50%, transparent)" }}
           >
             <ShieldCheck className="h-4 w-4 text-violet" /> Painel Admin
+          </Link>
+        )}
+
+        {showPix && (
+          <Link
+            to="/paywall"
+            className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-neon/40 bg-surface px-4 py-2.5 text-sm font-medium"
+          >
+            <KeyRound className="h-4 w-4 text-neon" /> Chave PIX
           </Link>
         )}
 
