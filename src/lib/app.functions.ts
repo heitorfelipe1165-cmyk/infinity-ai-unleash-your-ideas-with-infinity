@@ -310,7 +310,20 @@ export const setUserBanState = createServerFn({ method: "POST" })
 
     if (last) {
       await context.supabase.from("subscriptions").update({ status }).eq("id", last.id);
+    } else {
+      const { data: profile } = await context.supabase
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", data.userId)
+        .maybeSingle();
+      await context.supabase.from("subscriptions").insert({
+        user_id: data.userId,
+        email: profile?.email ?? "",
+        name: profile?.full_name ?? "Usuário",
+        status,
+      });
     }
+
 
     return { ok: true };
   });
