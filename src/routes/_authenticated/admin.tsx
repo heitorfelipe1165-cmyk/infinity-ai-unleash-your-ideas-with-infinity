@@ -172,18 +172,17 @@ function AdminPage() {
                       <td className="px-5 py-3">
                         <span
                           className={`rounded-full border px-2.5 py-1 text-[11px] ${
-                            row.subscription_status === "active"
+                            row.status === "finalized"
                               ? "border-neon/50 text-neon"
-                              : row.status === "rejected"
+                              : row.status === "rejected" || row.status === "banned"
                                 ? "border-destructive/50 text-destructive"
                                 : "border-border text-muted-foreground"
                           }`}
                         >
-                          {row.subscription_status === "active"
-                            ? "Ativo"
-                            : (statusLabel[row.status] ?? row.status)}
+                          {statusLabel[row.status] ?? row.status}
                         </span>
                       </td>
+
                       <td className="px-5 py-3">
                         <div className="flex flex-wrap gap-2">
                           <button
