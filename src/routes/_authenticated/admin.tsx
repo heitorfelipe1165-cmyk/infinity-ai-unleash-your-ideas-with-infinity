@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Loader2, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Check, Crown, Loader2, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { decidePaymentRequest, getAccountState, listPaymentRequests } from "@/lib/app.functions";
 
@@ -76,14 +76,22 @@ function AdminPage() {
   }, [queryClient]);
 
   const mutation = useMutation({
-    mutationFn: (vars: { requestId: string; approve: boolean }) => decide({ data: vars }),
+    mutationFn: (vars: { requestId: string; decision: "approve" | "reject" | "vip" }) =>
+      decide({ data: vars }),
     onSuccess: (_result, vars) => {
-      toast.success(vars.approve ? "Acesso aprovado!" : "Solicitação recusada");
+      toast.success(
+        vars.decision === "approve"
+          ? "Acesso aprovado! O cliente já pode ver a chave PIX."
+          : vars.decision === "vip"
+            ? "Aprovado direto (VIP): chat liberado sem cobrança."
+            : "Solicitação recusada",
+      );
       queryClient.invalidateQueries({ queryKey: ["payment-requests"] });
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Não foi possível concluir"),
   });
+
 
   if (account.isLoading || !account.data?.isAdmin) {
     return (
