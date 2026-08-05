@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Menu, SendHorizonal, Sparkles } from "lucide-react";
+import { Loader2, Menu, Paperclip, SendHorizonal, Sparkles, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getAccountState } from "@/lib/app.functions";
 import { ChatSidebar, type ChatSummary } from "@/components/chat/ChatSidebar";
