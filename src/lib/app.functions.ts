@@ -10,10 +10,15 @@ export type AccountState = {
   fullName: string | null;
   isAdmin: boolean;
   subscriptionStatus: string;
-  /** Status da última solicitação de assinatura: null | pending | approved | rejected */
+  /** Status da última solicitação: null | pending | approved | rejected | finalized | banned */
   requestStatus: string | null;
+  /** Conta suspensa pelo administrador */
+  isBanned: boolean;
+  /** Chave PIX liberada para exibição (aprovado, aguardando confirmação do pagamento) */
+  pixUnlocked: boolean;
   hasAccess: boolean;
 };
+
 
 /**
  * Garante que o perfil exista, aplica o cargo de Dono/Administrador ao e-mail
