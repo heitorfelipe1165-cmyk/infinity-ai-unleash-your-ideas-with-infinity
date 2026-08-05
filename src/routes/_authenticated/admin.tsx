@@ -30,9 +30,12 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 const statusLabel: Record<string, string> = {
   pending: "Pendente",
-  approved: "Aprovado",
+  approved: "Aprovado (aguardando PIX)",
   rejected: "Recusado",
+  finalized: "Chat liberado",
+  banned: "Banido",
 };
+
 
 function AdminPage() {
   const navigate = useNavigate();
