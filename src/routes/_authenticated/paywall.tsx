@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { createPaymentRequest, getAccountState } from "@/lib/app.functions";
+import { createPaymentRequest, finalizePayment, getAccountState } from "@/lib/app.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 const PIX_KEY =
