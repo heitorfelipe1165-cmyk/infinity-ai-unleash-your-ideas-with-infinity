@@ -274,7 +274,7 @@ function ChatPage() {
           chats={chats}
           activeChatId={activeChatId}
           isAdmin={account.data.isAdmin}
-            showPix={!account.data.isAdmin && account.data.requestStatus === "approved"}
+            showPix={account.data.pixUnlocked}
           email={account.data.email}
           onNewChat={newChat}
           onOpenHistory={() => {
