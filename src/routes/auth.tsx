@@ -1,0 +1,147 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Infinity as InfinityIcon, Loader2, LockKeyhole, Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+export const Route = createFileRoute("/auth")({
+  head: () => ({
+    meta: [
+      { title: "Entrar na Infinity AI" },
+      {
+        name: "description",
+        content: "Acesse sua conta Infinity AI ou crie uma nova para conversar com a IA de elite.",
+      },
+      { property: "og:title", content: "Entrar na Infinity AI" },
+      {
+        property: "og:description",
+        content: "Login e cadastro da Infinity AI com e-mail e senha.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: AuthPage,
+});
+
+function AuthPage() {
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate({ to: "/chat", replace: true });
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        navigate({ to: "/chat", replace: true });
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [navigate]);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (error) throw error;
+        if (!data.session) {
+          toast.success("Conta criada! Confirme seu e-mail para acessar.");
+          return;
+        }
+        toast.success("Conta criada com sucesso!");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast.success("Bem-vindo de volta!");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível continuar");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="relative flex min-h-screen items-center justify-center px-4">
+      <div className="hero-glow pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-50" />
+
+      <div className="surface-panel glow-ring relative w-full max-w-md rounded-3xl p-8 shadow-[0_0_50px_-20px_var(--violet)]">
+        <Link to="/" className="flex items-center gap-2">
+          <InfinityIcon className="h-6 w-6 text-neon" />
+          <span className="font-display text-base font-semibold">Infinity AI</span>
+        </Link>
+
+        <h1 className="mt-8 text-2xl font-bold">
+          {mode === "signin" ? "Entrar na sua conta" : "Criar sua conta"}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {mode === "signin"
+            ? "Use seu e-mail e senha para acessar a Infinity AI."
+            : "Cadastre-se com e-mail e senha para começar."}
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          <label className="block">
+            <span className="text-xs font-medium text-muted-foreground">E-mail</span>
+            <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="voce@email.com"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-muted-foreground">Senha</span>
+            <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
+              <LockKeyhole className="h-4 w-4 text-muted-foreground" />
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+          </label>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="glow-ring bg-gradient-neon inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_28px_-6px_var(--violet)] disabled:opacity-60"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {mode === "signin" ? "Entrar" : "Criar conta"}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+          className="mt-6 w-full text-center text-xs text-muted-foreground transition-colors hover:text-neon"
+        >
+          {mode === "signin"
+            ? "Não tem conta? Cadastre-se"
+            : "Já possui conta? Faça login"}
+        </button>
+      </div>
+    </main>
+  );
+}
