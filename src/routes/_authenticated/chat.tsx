@@ -51,6 +51,7 @@ function ChatPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const account = useQuery({
     queryKey: ["account"],
