@@ -86,14 +86,24 @@ export function ChatSidebar({
 
       <div className="space-y-2 border-t border-sidebar-border p-3">
         {isAdmin && (
-          <Link
-            to="/admin"
-            className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-violet/50 bg-surface px-4 py-2.5 text-sm font-medium"
-            style={{ borderColor: "color-mix(in oklab, var(--violet) 50%, transparent)" }}
-          >
-            <ShieldCheck className="h-4 w-4 text-violet" /> Painel Admin
-          </Link>
+          <>
+            <Link
+              to="/admin"
+              className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-violet/50 bg-surface px-4 py-2.5 text-sm font-medium"
+              style={{ borderColor: "color-mix(in oklab, var(--violet) 50%, transparent)" }}
+            >
+              <ShieldCheck className="h-4 w-4 text-violet" /> Painel Admin
+            </Link>
+            <Link
+              to="/controle"
+              className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-violet/50 bg-surface px-4 py-2.5 text-sm font-medium"
+              style={{ borderColor: "color-mix(in oklab, var(--violet) 50%, transparent)" }}
+            >
+              <ShieldAlert className="h-4 w-4 text-violet" /> Controle
+            </Link>
+          </>
         )}
+
 
         {showPix && (
           <Link
