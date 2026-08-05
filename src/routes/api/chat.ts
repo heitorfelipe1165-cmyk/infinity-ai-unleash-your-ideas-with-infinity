@@ -5,7 +5,26 @@ Responda sempre no idioma do usuário (padrão: português do Brasil).
 Use markdown bem estruturado: títulos com #, listas, negrito e tabelas em markdown quando houver dados tabulares.
 Quando o usuário pedir um relatório, documento, planilha, tabela ou apresentação de slides, estruture a resposta com títulos claros e seções curtas, e use tabelas markdown para dados, de modo que o conteúdo possa ser exportado para Word, Excel, PowerPoint ou TXT.`;
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; images?: string[] };
+
+type Part =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+// Converte a mensagem em conteúdo multimodal quando houver imagens anexadas.
+function toGatewayMessage(msg: Msg): { role: string; content: string | Part[] } {
+  const images = (msg.images ?? []).filter(
+    (src) => typeof src === "string" && (src.startsWith("data:image/") || src.startsWith("https://")),
+  );
+  if (msg.role !== "user" || images.length === 0) {
+    return { role: msg.role, content: msg.content };
+  }
+  const parts: Part[] = [
+    { type: "text", text: msg.content.trim() || "Analise a imagem enviada." },
+    ...images.slice(0, 4).map((url) => ({ type: "image_url" as const, image_url: { url } })),
+  ];
+  return { role: msg.role, content: parts };
+}
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -61,7 +80,9 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const body = (await request.json()) as { messages?: Msg[] };
-        const messages = Array.isArray(body.messages) ? body.messages.slice(-30) : [];
+        const messages = (Array.isArray(body.messages) ? body.messages.slice(-30) : []).map(
+          toGatewayMessage,
+        );
         if (messages.length === 0) {
           return new Response("Mensagens obrigatórias", { status: 400 });
         }

@@ -16,7 +16,8 @@ import { Link } from "@tanstack/react-router";
 import { createPaymentRequest, getAccountState } from "@/lib/app.functions";
 import { supabase } from "@/integrations/supabase/client";
 
-const PIX_KEY = "dd43ac3b-ea9d-4f70-bc06-60a3f5f200ac";
+const PIX_KEY =
+  "00020126580014br.gov.bcb.pix013633366dfb-6a77-4aae-af7d-1341bbd7c111520400005303986540530.005802BR5925CAIO EMANUEL SILVA WERNES6010Vila Velha6211050726f787963047EAE";
 
 export const Route = createFileRoute("/_authenticated/paywall")({
   head: () => ({
@@ -153,7 +154,9 @@ function Paywall() {
               <p className="mt-4 text-xs font-medium text-muted-foreground">
                 Chave PIX (Copia e Cola)
               </p>
-              <p className="mt-2 break-all font-mono text-sm text-neon">{PIX_KEY}</p>
+              <p className="scrollbar-slim mt-2 max-h-32 overflow-y-auto break-all rounded-lg border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-neon">
+                {PIX_KEY}
+              </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   onClick={copyPix}
