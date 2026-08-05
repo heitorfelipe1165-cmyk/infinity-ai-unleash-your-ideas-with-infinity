@@ -12,7 +12,7 @@ import {
   MessageSquare,
   Sparkles,
 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+
 import { createPaymentRequest, finalizePayment, getAccountState } from "@/lib/app.functions";
 import { supabase } from "@/integrations/supabase/client";
 
