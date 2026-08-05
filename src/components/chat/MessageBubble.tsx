@@ -30,7 +30,23 @@ export function MessageBubble({ message, streaming, showDownloads }: Props) {
         }`}
       >
         {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <>
+            {message.images && message.images.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {message.images.map((src, i) => (
+                  <img
+                    key={i}
+                    src={src}
+                    alt={`Imagem enviada ${i + 1}`}
+                    className="max-h-40 rounded-lg border border-border object-cover"
+                  />
+                ))}
+              </div>
+            )}
+            {message.content.trim().length > 0 && (
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            )}
+          </>
         ) : (
           <div className="space-y-3 [&_a]:text-neon [&_code]:rounded [&_code]:bg-background [&_code]:px-1 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:text-base [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-background [&_pre]:p-3 [&_strong]:text-foreground [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border [&_th]:bg-background [&_th]:px-2 [&_th]:py-1">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
