@@ -12,8 +12,8 @@ import {
   MessageSquare,
   Sparkles,
 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { createPaymentRequest, getAccountState } from "@/lib/app.functions";
+
+import { createPaymentRequest, finalizePayment, getAccountState } from "@/lib/app.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 const PIX_KEY =
@@ -45,6 +45,7 @@ function Paywall() {
   const queryClient = useQueryClient();
   const fetchAccount = useServerFn(getAccountState);
   const submitRequest = useServerFn(createPaymentRequest);
+  const confirmPix = useServerFn(finalizePayment);
 
   const [fullName, setFullName] = useState("");
   const [copied, setCopied] = useState(false);
@@ -56,12 +57,30 @@ function Paywall() {
   });
 
   const requestStatus = account.data?.requestStatus ?? null;
-  const approved = requestStatus === "approved";
+  const pixUnlocked = account.data?.pixUnlocked ?? false;
+  const banned = account.data?.isBanned ?? false;
 
   // Administradores vão direto ao chat. Clientes aprovados ficam aqui para ver a chave PIX.
   useEffect(() => {
     if (account.data?.isAdmin) navigate({ to: "/chat", replace: true });
   }, [account.data?.isAdmin, navigate]);
+
+  // Já liberou o chat: segue direto para a conversa.
+  useEffect(() => {
+    if (account.data?.hasAccess && !account.data.isAdmin) navigate({ to: "/chat", replace: true });
+  }, [account.data?.hasAccess, account.data?.isAdmin, navigate]);
+
+  // Conta suspensa: desloga na hora.
+  useEffect(() => {
+    if (!banned) return;
+    toast.error("Sua conta foi suspensa");
+    void (async () => {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await supabase.auth.signOut();
+      navigate({ to: "/auth", replace: true });
+    })();
+  }, [banned, navigate, queryClient]);
 
   // Atualiza a tela assim que o administrador aprovar a solicitação.
   useEffect(() => {
@@ -71,6 +90,9 @@ function Paywall() {
         "postgres_changes",
         { event: "*", schema: "public", table: "subscriptions" },
         () => queryClient.invalidateQueries({ queryKey: ["account"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () =>
+        queryClient.invalidateQueries({ queryKey: ["account"] }),
       )
       .subscribe();
     return () => {
@@ -87,6 +109,17 @@ function Paywall() {
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Não foi possível enviar"),
+  });
+
+  const release = useMutation({
+    mutationFn: () => confirmPix({ data: undefined }),
+    onSuccess: async () => {
+      toast.success("Pagamento confirmado! Chat liberado.");
+      await queryClient.invalidateQueries({ queryKey: ["account"] });
+      navigate({ to: "/chat", replace: true });
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Não foi possível liberar o chat"),
   });
 
   async function copyPix() {
@@ -111,6 +144,7 @@ function Paywall() {
     await supabase.auth.signOut();
     navigate({ to: "/auth", replace: true });
   }
+
 
   return (
     <main className="relative min-h-screen px-4 py-10">
@@ -145,11 +179,12 @@ function Paywall() {
             Excel, PowerPoint e TXT. Pague via PIX e o administrador libera seu acesso em instantes.
           </p>
 
-          {approved && (
+          {pixUnlocked && (
             <div className="mt-8 rounded-2xl border border-neon/40 bg-background p-5 shadow-[var(--shadow-neon)]">
               <p className="text-sm font-semibold text-neon">Solicitação aprovada!</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Pague R$ 30,00 com a chave PIX abaixo e aproveite o acesso liberado.
+                Pague R$ 30,00 com a chave PIX abaixo e depois clique em “Já fiz o PIX - Liberar
+                Chat”.
               </p>
               <p className="mt-4 text-xs font-medium text-muted-foreground">
                 Chave PIX (Copia e Cola)
@@ -157,25 +192,32 @@ function Paywall() {
               <p className="scrollbar-slim mt-2 max-h-32 overflow-y-auto break-all rounded-lg border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-neon">
                 {PIX_KEY}
               </p>
-              <div className="mt-4 flex flex-wrap gap-3">
+              <div className="mt-4 flex flex-col gap-3">
                 <button
                   onClick={copyPix}
-                  className="glow-ring bg-gradient-neon inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_26px_-6px_var(--violet)]"
+                  className="glow-ring bg-gradient-neon inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_26px_-6px_var(--violet)]"
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copiado!" : "Copiar Chave PIX"}
+                  {copied ? "Copiado!" : "Copiar PIX"}
                 </button>
-                <Link
-                  to="/chat"
-                  className="glow-ring glow-ring-hover inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-2.5 text-sm font-semibold"
+                <button
+                  onClick={() => release.mutate()}
+                  disabled={release.isPending}
+                  className="glow-ring glow-ring-hover inline-flex items-center justify-center gap-2 rounded-xl border border-neon/50 bg-surface px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
                 >
-                  <MessageSquare className="h-4 w-4" /> Ir para o chat
-                </Link>
+                  {release.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageSquare className="h-4 w-4 text-neon" />
+                  )}
+                  Já fiz o PIX - Liberar Chat
+                </button>
               </div>
             </div>
           )}
 
-          {approved ? null : sent || requestStatus === "pending" ? (
+          {pixUnlocked ? null : sent || requestStatus === "pending" ? (
+
             <div className="glow-ring mt-8 rounded-2xl border border-neon/40 bg-surface p-5 text-sm shadow-[var(--shadow-neon)]">
               Solicitação enviada com sucesso! Aguarde a aprovação do administrador.
             </div>

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Loader2, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Check, Crown, Loader2, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { decidePaymentRequest, getAccountState, listPaymentRequests } from "@/lib/app.functions";
 
@@ -30,9 +30,12 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 const statusLabel: Record<string, string> = {
   pending: "Pendente",
-  approved: "Aprovado",
+  approved: "Aprovado (aguardando PIX)",
   rejected: "Recusado",
+  finalized: "Chat liberado",
+  banned: "Banido",
 };
+
 
 function AdminPage() {
   const navigate = useNavigate();
@@ -76,14 +79,22 @@ function AdminPage() {
   }, [queryClient]);
 
   const mutation = useMutation({
-    mutationFn: (vars: { requestId: string; approve: boolean }) => decide({ data: vars }),
+    mutationFn: (vars: { requestId: string; decision: "approve" | "reject" | "vip" }) =>
+      decide({ data: vars }),
     onSuccess: (_result, vars) => {
-      toast.success(vars.approve ? "Acesso aprovado!" : "Solicitação recusada");
+      toast.success(
+        vars.decision === "approve"
+          ? "Acesso aprovado! O cliente já pode ver a chave PIX."
+          : vars.decision === "vip"
+            ? "Aprovado direto (VIP): chat liberado sem cobrança."
+            : "Solicitação recusada",
+      );
       queryClient.invalidateQueries({ queryKey: ["payment-requests"] });
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Não foi possível concluir"),
   });
+
 
   if (account.isLoading || !account.data?.isAdmin) {
     return (
@@ -122,9 +133,10 @@ function AdminPage() {
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <StatCard label="Solicitações pendentes" value={pending.length} />
           <StatCard
-            label="Assinaturas ativas"
-            value={rows.filter((r) => r.subscription_status === "active").length}
+            label="Chats liberados"
+            value={rows.filter((r) => r.status === "finalized").length}
           />
+
           <StatCard label="Total de solicitações" value={rows.length} />
         </div>
 
@@ -161,24 +173,23 @@ function AdminPage() {
                       <td className="px-5 py-3">
                         <span
                           className={`rounded-full border px-2.5 py-1 text-[11px] ${
-                            row.subscription_status === "active"
+                            row.status === "finalized"
                               ? "border-neon/50 text-neon"
-                              : row.status === "rejected"
+                              : row.status === "rejected" || row.status === "banned"
                                 ? "border-destructive/50 text-destructive"
                                 : "border-border text-muted-foreground"
                           }`}
                         >
-                          {row.subscription_status === "active"
-                            ? "Ativo"
-                            : (statusLabel[row.status] ?? row.status)}
+                          {statusLabel[row.status] ?? row.status}
                         </span>
                       </td>
+
                       <td className="px-5 py-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             disabled={mutation.isPending}
                             onClick={() =>
-                              mutation.mutate({ requestId: row.id, approve: true })
+                              mutation.mutate({ requestId: row.id, decision: "approve" })
                             }
                             className="glow-ring glow-ring-hover inline-flex items-center gap-1.5 rounded-lg border border-neon/40 bg-background px-3 py-1.5 text-[11px] font-medium disabled:opacity-50"
                           >
@@ -186,8 +197,18 @@ function AdminPage() {
                           </button>
                           <button
                             disabled={mutation.isPending}
+                            onClick={() => mutation.mutate({ requestId: row.id, decision: "vip" })}
+                            className="glow-ring glow-ring-hover inline-flex items-center gap-1.5 rounded-lg border border-violet/60 bg-background px-3 py-1.5 text-[11px] font-medium disabled:opacity-50"
+                            style={{
+                              borderColor: "color-mix(in oklab, var(--violet) 60%, transparent)",
+                            }}
+                          >
+                            <Crown className="h-3.5 w-3.5 text-violet" /> Aprovar Direto (VIP)
+                          </button>
+                          <button
+                            disabled={mutation.isPending}
                             onClick={() =>
-                              mutation.mutate({ requestId: row.id, approve: false })
+                              mutation.mutate({ requestId: row.id, decision: "reject" })
                             }
                             className="glow-ring inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-medium transition-colors hover:border-destructive disabled:opacity-50"
                           >
@@ -195,6 +216,7 @@ function AdminPage() {
                           </button>
                         </div>
                       </td>
+
                     </tr>
                   ))}
                 </tbody>

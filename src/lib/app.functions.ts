@@ -10,10 +10,15 @@ export type AccountState = {
   fullName: string | null;
   isAdmin: boolean;
   subscriptionStatus: string;
-  /** Status da última solicitação de assinatura: null | pending | approved | rejected */
+  /** Status da última solicitação: null | pending | approved | rejected | finalized | banned */
   requestStatus: string | null;
+  /** Conta suspensa pelo administrador */
+  isBanned: boolean;
+  /** Chave PIX liberada para exibição (aprovado, aguardando confirmação do pagamento) */
+  pixUnlocked: boolean;
   hasAccess: boolean;
 };
+
 
 /**
  * Garante que o perfil exista, aplica o cargo de Dono/Administrador ao e-mail
@@ -78,6 +83,9 @@ export const getAccountState = createServerFn({ method: "POST" })
     const requestStatus = lastRequest?.status ?? null;
     if (!fullName && lastRequest?.name) fullName = lastRequest.name;
 
+    const isBanned =
+      !isAdmin && (subscriptionStatus === "banned" || requestStatus === "banned");
+
     return {
       userId,
       email,
@@ -85,9 +93,39 @@ export const getAccountState = createServerFn({ method: "POST" })
       isAdmin,
       subscriptionStatus,
       requestStatus,
-      hasAccess: isAdmin || subscriptionStatus === "active" || requestStatus === "approved",
+      isBanned,
+      pixUnlocked: !isAdmin && !isBanned && requestStatus === "approved",
+      hasAccess: isAdmin || (!isBanned && requestStatus === "finalized"),
     };
   });
+
+/** O cliente confirma que já realizou o PIX, liberando o chat. */
+export const finalizePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: last } = await context.supabase
+      .from("subscriptions")
+      .select("id, status")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!last) throw new Error("Nenhuma solicitação encontrada");
+    if (last.status === "banned") throw new Error("Sua conta foi suspensa");
+    if (last.status !== "approved" && last.status !== "finalized") {
+      throw new Error("Aguarde a aprovação do administrador");
+    }
+
+    const { error } = await context.supabase
+      .from("subscriptions")
+      .update({ status: "finalized" })
+      .eq("id", last.id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 
 export const createPaymentRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -153,25 +191,30 @@ export const listPaymentRequests = createServerFn({ method: "POST" })
     }));
   });
 
+async function assertAdmin(supabase: {
+  from: (t: string) => any;
+}, userId: string) {
+  const { data: adminRole } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (!adminRole) throw new Error("Acesso restrito ao administrador");
+}
+
 export const decidePaymentRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
         requestId: z.string().uuid(),
-        approve: z.boolean(),
+        decision: z.enum(["approve", "reject", "vip"]),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { data: adminRole } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    if (!adminRole) throw new Error("Acesso restrito ao administrador");
-
+    await assertAdmin(context.supabase, context.userId);
 
     const { data: request, error } = await context.supabase
       .from("subscriptions")
@@ -180,25 +223,108 @@ export const decidePaymentRequest = createServerFn({ method: "POST" })
       .single();
     if (error || !request) throw new Error("Solicitação não encontrada");
 
-    if (data.approve) {
-      await context.supabase
-        .from("subscriptions")
-        .update({ status: "approved" })
-        .eq("id", request.id);
-      await context.supabase
-        .from("profiles")
-        .update({ subscription_status: "active" })
-        .eq("id", request.user_id);
-    } else {
-      await context.supabase
-        .from("subscriptions")
-        .update({ status: "rejected" })
-        .eq("id", request.id);
-      await context.supabase
-        .from("profiles")
-        .update({ subscription_status: "inactive" })
-        .eq("id", request.user_id);
-    }
+    const status =
+      data.decision === "approve"
+        ? "approved"
+        : data.decision === "vip"
+          ? "finalized"
+          : "rejected";
+
+    await context.supabase.from("subscriptions").update({ status }).eq("id", request.id);
+    await context.supabase
+      .from("profiles")
+      .update({ subscription_status: status === "rejected" ? "inactive" : "active" })
+      .eq("id", request.user_id);
 
     return { ok: true };
   });
+
+export type ManagedUser = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  status: string;
+  created_at: string;
+  isBanned: boolean;
+};
+
+/** Lista todos os usuários cadastrados para o painel de Controle. */
+export const listAllUsers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ManagedUser[]> => {
+    await assertAdmin(context.supabase, context.userId);
+
+    const { data: profiles, error } = await context.supabase
+      .from("profiles")
+      .select("id, email, full_name, subscription_status, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const { data: subs } = await context.supabase
+      .from("subscriptions")
+      .select("user_id, status, created_at")
+      .order("created_at", { ascending: false });
+
+    const latest = new Map<string, string>();
+    for (const sub of subs ?? []) {
+      if (!latest.has(sub.user_id)) latest.set(sub.user_id, sub.status);
+    }
+
+    return (profiles ?? []).map((p) => {
+      const banned = p.subscription_status === "banned" || latest.get(p.id) === "banned";
+      return {
+        id: p.id,
+        email: p.email,
+        full_name: p.full_name,
+        created_at: p.created_at,
+        status: banned ? "banned" : (latest.get(p.id) ?? p.subscription_status),
+        isBanned: banned,
+      };
+    });
+  });
+
+/** Banir ou desbanir um usuário. Desbanir libera o chat (status 'finalized'). */
+export const setUserBanState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ userId: z.string().uuid(), banned: z.boolean() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    if (data.userId === context.userId) throw new Error("Você não pode banir a si mesmo");
+
+    const status = data.banned ? "banned" : "finalized";
+
+    await context.supabase
+      .from("profiles")
+      .update({ subscription_status: data.banned ? "banned" : "active" })
+      .eq("id", data.userId);
+
+    const { data: last } = await context.supabase
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", data.userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (last) {
+      await context.supabase.from("subscriptions").update({ status }).eq("id", last.id);
+    } else {
+      const { data: profile } = await context.supabase
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", data.userId)
+        .maybeSingle();
+      await context.supabase.from("subscriptions").insert({
+        user_id: data.userId,
+        email: profile?.email ?? "",
+        name: profile?.full_name ?? "Usuário",
+        status,
+      });
+    }
+
+
+    return { ok: true };
+  });
+

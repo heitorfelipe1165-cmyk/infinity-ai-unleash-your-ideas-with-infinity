@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
+import { Route as AuthenticatedControleRouteImport } from './routes/_authenticated/controle'
 import { Route as AuthenticatedPaywallRouteImport } from './routes/_authenticated/paywall'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
@@ -41,6 +42,11 @@ const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedControleRoute = AuthenticatedControleRouteImport.update({
+  id: '/controle',
+  path: '/controle',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPaywallRoute = AuthenticatedPaywallRouteImport.update({
   id: '/paywall',
   path: '/paywall',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/controle': typeof AuthenticatedControleRoute
   '/paywall': typeof AuthenticatedPaywallRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -65,6 +72,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/controle': typeof AuthenticatedControleRoute
   '/paywall': typeof AuthenticatedPaywallRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -75,14 +83,17 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
+  '/_authenticated/controle': typeof AuthenticatedControleRoute
   '/_authenticated/paywall': typeof AuthenticatedPaywallRoute
   '/api/chat': typeof ApiChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/admin' | '/chat' | '/paywall' | '/api/chat'
+  fullPaths:
+    '/' | '/auth' | '/admin' | '/chat' | '/controle' | '/paywall' | '/api/chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/admin' | '/chat' | '/paywall' | '/api/chat'
+  to:
+    '/' | '/auth' | '/admin' | '/chat' | '/controle' | '/paywall' | '/api/chat'
   id:
     | '__root__'
     | '/'
@@ -90,6 +101,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/admin'
     | '/_authenticated/chat'
+    | '/_authenticated/controle'
     | '/_authenticated/paywall'
     | '/api/chat'
   fileRoutesById: FileRoutesById
@@ -138,6 +150,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/controle': {
+      id: '/_authenticated/controle'
+      path: '/controle'
+      fullPath: '/controle'
+      preLoaderRoute: typeof AuthenticatedControleRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/paywall': {
       id: '/_authenticated/paywall'
       path: '/paywall'
@@ -158,12 +177,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
+  AuthenticatedControleRoute: typeof AuthenticatedControleRoute
   AuthenticatedPaywallRoute: typeof AuthenticatedPaywallRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
+  AuthenticatedControleRoute: AuthenticatedControleRoute,
   AuthenticatedPaywallRoute: AuthenticatedPaywallRoute,
 }
 
