@@ -83,6 +83,9 @@ export const getAccountState = createServerFn({ method: "POST" })
     const requestStatus = lastRequest?.status ?? null;
     if (!fullName && lastRequest?.name) fullName = lastRequest.name;
 
+    const isBanned =
+      !isAdmin && (subscriptionStatus === "banned" || requestStatus === "banned");
+
     return {
       userId,
       email,
@@ -90,9 +93,39 @@ export const getAccountState = createServerFn({ method: "POST" })
       isAdmin,
       subscriptionStatus,
       requestStatus,
-      hasAccess: isAdmin || subscriptionStatus === "active" || requestStatus === "approved",
+      isBanned,
+      pixUnlocked: !isAdmin && !isBanned && requestStatus === "approved",
+      hasAccess: isAdmin || (!isBanned && requestStatus === "finalized"),
     };
   });
+
+/** O cliente confirma que já realizou o PIX, liberando o chat. */
+export const finalizePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: last } = await context.supabase
+      .from("subscriptions")
+      .select("id, status")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!last) throw new Error("Nenhuma solicitação encontrada");
+    if (last.status === "banned") throw new Error("Sua conta foi suspensa");
+    if (last.status !== "approved" && last.status !== "finalized") {
+      throw new Error("Aguarde a aprovação do administrador");
+    }
+
+    const { error } = await context.supabase
+      .from("subscriptions")
+      .update({ status: "finalized" })
+      .eq("id", last.id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 
 export const createPaymentRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
