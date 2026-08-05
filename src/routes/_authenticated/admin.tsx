@@ -133,9 +133,10 @@ function AdminPage() {
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <StatCard label="Solicitações pendentes" value={pending.length} />
           <StatCard
-            label="Assinaturas ativas"
-            value={rows.filter((r) => r.subscription_status === "active").length}
+            label="Chats liberados"
+            value={rows.filter((r) => r.status === "finalized").length}
           />
+
           <StatCard label="Total de solicitações" value={rows.length} />
         </div>
 
