@@ -1,0 +1,99 @@
+import { Link } from "@tanstack/react-router";
+import { Folder, Infinity as InfinityIcon, LogOut, MessageSquare, Plus, ShieldCheck } from "lucide-react";
+
+export type ChatSummary = { id: string; title: string; created_at: string };
+
+type Props = {
+  chats: ChatSummary[];
+  activeChatId: string | null;
+  isAdmin: boolean;
+  email: string;
+  onNewChat: () => void;
+  onOpenHistory: () => void;
+  onSelectChat: (id: string) => void;
+  onSignOut: () => void;
+};
+
+export function ChatSidebar({
+  chats,
+  activeChatId,
+  isAdmin,
+  email,
+  onNewChat,
+  onOpenHistory,
+  onSelectChat,
+  onSignOut,
+}: Props) {
+  return (
+    <aside className="flex h-full w-full flex-col border-r border-sidebar-border bg-sidebar md:w-72">
+      <div className="flex items-center gap-2 px-4 py-4">
+        <InfinityIcon className="h-6 w-6 text-neon" />
+        <span className="font-display text-base font-semibold">Infinity AI</span>
+      </div>
+
+      <div className="space-y-2 px-3">
+        <button
+          onClick={onNewChat}
+          className="glow-ring bg-gradient-neon flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_26px_-6px_var(--violet)]"
+        >
+          <Plus className="h-4 w-4" /> Novo Chat
+        </button>
+
+        <button
+          onClick={onOpenHistory}
+          className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-sidebar-border bg-surface px-4 py-2.5 text-sm font-medium"
+        >
+          <Folder className="h-4 w-4 text-neon" /> Chats
+        </button>
+      </div>
+
+      <div className="scrollbar-slim mt-5 flex-1 overflow-y-auto px-3 pb-3">
+        <p className="px-1 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Conversas
+        </p>
+        {chats.length === 0 ? (
+          <p className="px-1 text-xs text-muted-foreground">Nenhuma conversa salva ainda.</p>
+        ) : (
+          <ul className="space-y-1">
+            {chats.map((chat) => (
+              <li key={chat.id}>
+                <button
+                  onClick={() => onSelectChat(chat.id)}
+                  className={`glow-ring flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                    activeChatId === chat.id
+                      ? "border border-neon/40 bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "border border-transparent text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{chat.title}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-sidebar-border p-3">
+        {isAdmin && (
+          <Link
+            to="/admin"
+            className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-violet/50 bg-surface px-4 py-2.5 text-sm font-medium"
+            style={{ borderColor: "color-mix(in oklab, var(--violet) 50%, transparent)" }}
+          >
+            <ShieldCheck className="h-4 w-4 text-violet" /> Painel Admin
+          </Link>
+        )}
+
+        <p className="truncate px-1 text-[11px] text-muted-foreground">{email}</p>
+
+        <button
+          onClick={onSignOut}
+          className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-sidebar-border bg-background px-4 py-2.5 text-sm"
+        >
+          <LogOut className="h-4 w-4" /> Sair
+        </button>
+      </div>
+    </aside>
+  );
+}
