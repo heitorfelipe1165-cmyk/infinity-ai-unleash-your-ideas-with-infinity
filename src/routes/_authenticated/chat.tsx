@@ -59,10 +59,41 @@ function ChatPage() {
   });
 
   useEffect(() => {
-    if (account.data && !account.data.hasAccess) {
+    if (!account.data) return;
+    if (account.data.isBanned) {
+      toast.error("Sua conta foi suspensa");
+      void (async () => {
+        await queryClient.cancelQueries();
+        queryClient.clear();
+        await supabase.auth.signOut();
+        navigate({ to: "/auth", replace: true });
+      })();
+      return;
+    }
+    if (!account.data.hasAccess) {
+      toast.error(
+        "Acesso bloqueado. O chat só será desbloqueado após a realização do PIX e confirmação do envio.",
+      );
       navigate({ to: "/paywall", replace: true });
     }
-  }, [account.data, navigate]);
+  }, [account.data, navigate, queryClient]);
+
+  // Mantém o acesso sincronizado em tempo real (aprovação, liberação, banimento).
+  useEffect(() => {
+    const channel = supabase
+      .channel("chat-access")
+      .on("postgres_changes", { event: "*", schema: "public", table: "subscriptions" }, () =>
+        queryClient.invalidateQueries({ queryKey: ["account"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () =>
+        queryClient.invalidateQueries({ queryKey: ["account"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
 
   const loadChats = useCallback(async () => {
     const { data } = await supabase
