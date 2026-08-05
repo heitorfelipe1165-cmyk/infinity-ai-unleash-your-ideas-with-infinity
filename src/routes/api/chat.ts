@@ -42,10 +42,14 @@ export const Route = createFileRoute("/api/chat")({
         const user = userData?.user;
         if (!user) return new Response("Unauthorized", { status: 401 });
 
-        const { data: isAdmin } = await supabase.rpc("has_role", {
-          _user_id: user.id,
-          _role: "admin",
-        });
+        const { data: adminRole } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        const isAdmin = adminRole !== null && adminRole !== undefined;
+
         const { data: profile } = await supabase
           .from("profiles")
           .select("subscription_status")
