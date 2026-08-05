@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, Check, Loader2, ShieldCheck, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { decidePaymentRequest, getAccountState, listPaymentRequests } from "@/lib/app.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -56,7 +57,23 @@ function AdminPage() {
     queryKey: ["payment-requests"],
     queryFn: () => fetchRequests({ data: undefined }),
     enabled: account.data?.isAdmin === true,
+    refetchInterval: 15000,
   });
+
+  // Painel em tempo real: novas solicitações aparecem sem recarregar.
+  useEffect(() => {
+    const channel = supabase
+      .channel("subscriptions-admin")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "subscriptions" },
+        () => queryClient.invalidateQueries({ queryKey: ["payment-requests"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const mutation = useMutation({
     mutationFn: (vars: { requestId: string; approve: boolean }) => decide({ data: vars }),
