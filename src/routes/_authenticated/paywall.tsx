@@ -3,7 +3,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Check, Copy, Infinity as InfinityIcon, Loader2, LogOut, Sparkles } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Infinity as InfinityIcon,
+  Loader2,
+  LogOut,
+  MessageSquare,
+  Sparkles,
+} from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { createPaymentRequest, getAccountState } from "@/lib/app.functions";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -45,14 +54,34 @@ function Paywall() {
     queryFn: () => fetchAccount({ data: undefined }),
   });
 
+  const requestStatus = account.data?.requestStatus ?? null;
+  const approved = requestStatus === "approved";
+
+  // Administradores vão direto ao chat. Clientes aprovados ficam aqui para ver a chave PIX.
   useEffect(() => {
-    if (account.data?.hasAccess) navigate({ to: "/chat", replace: true });
-  }, [account.data?.hasAccess, navigate]);
+    if (account.data?.isAdmin) navigate({ to: "/chat", replace: true });
+  }, [account.data?.isAdmin, navigate]);
+
+  // Atualiza a tela assim que o administrador aprovar a solicitação.
+  useEffect(() => {
+    const channel = supabase
+      .channel("subscriptions-paywall")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "subscriptions" },
+        () => queryClient.invalidateQueries({ queryKey: ["account"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const mutation = useMutation({
     mutationFn: (name: string) => submitRequest({ data: { fullName: name } }),
     onSuccess: () => {
       setSent(true);
+      toast.success("Solicitação enviada com sucesso! Aguarde a aprovação do administrador.");
       queryClient.invalidateQueries({ queryKey: ["account"] });
     },
     onError: (error) =>
@@ -115,21 +144,37 @@ function Paywall() {
             Excel, PowerPoint e TXT. Pague via PIX e o administrador libera seu acesso em instantes.
           </p>
 
-          <div className="mt-8 rounded-2xl border border-border bg-background p-5">
-            <p className="text-xs font-medium text-muted-foreground">Chave PIX (Copia e Cola)</p>
-            <p className="mt-2 break-all font-mono text-sm text-neon">{PIX_KEY}</p>
-            <button
-              onClick={copyPix}
-              className="glow-ring bg-gradient-neon mt-4 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_26px_-6px_var(--violet)]"
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copiado!" : "Copiar Chave PIX"}
-            </button>
-          </div>
+          {approved && (
+            <div className="mt-8 rounded-2xl border border-neon/40 bg-background p-5 shadow-[var(--shadow-neon)]">
+              <p className="text-sm font-semibold text-neon">Solicitação aprovada!</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pague R$ 30,00 com a chave PIX abaixo e aproveite o acesso liberado.
+              </p>
+              <p className="mt-4 text-xs font-medium text-muted-foreground">
+                Chave PIX (Copia e Cola)
+              </p>
+              <p className="mt-2 break-all font-mono text-sm text-neon">{PIX_KEY}</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  onClick={copyPix}
+                  className="glow-ring bg-gradient-neon inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_26px_-6px_var(--violet)]"
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copiado!" : "Copiar Chave PIX"}
+                </button>
+                <Link
+                  to="/chat"
+                  className="glow-ring glow-ring-hover inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-2.5 text-sm font-semibold"
+                >
+                  <MessageSquare className="h-4 w-4" /> Ir para o chat
+                </Link>
+              </div>
+            </div>
+          )}
 
-          {sent ? (
+          {approved ? null : sent || requestStatus === "pending" ? (
             <div className="glow-ring mt-8 rounded-2xl border border-neon/40 bg-surface p-5 text-sm shadow-[var(--shadow-neon)]">
-              Seu pagamento foi enviado! O administrador irá liberar seu acesso em instantes.
+              Solicitação enviada com sucesso! Aguarde a aprovação do administrador.
             </div>
           ) : (
             <form
