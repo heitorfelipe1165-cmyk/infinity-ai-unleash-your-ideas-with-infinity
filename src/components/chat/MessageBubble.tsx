@@ -3,7 +3,7 @@ import remarkGfm from "remark-gfm";
 import { Bot, User } from "lucide-react";
 import { DownloadBar } from "./DownloadBar";
 
-export type ChatMessage = { role: "user" | "assistant"; content: string };
+export type ChatMessage = { role: "user" | "assistant"; content: string; images?: string[] };
 
 type Props = {
   message: ChatMessage;
