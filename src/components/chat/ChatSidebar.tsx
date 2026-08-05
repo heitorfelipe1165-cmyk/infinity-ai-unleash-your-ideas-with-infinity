@@ -6,7 +6,9 @@ import {
   LogOut,
   MessageSquare,
   Plus,
+  ShieldAlert,
   ShieldCheck,
+
 } from "lucide-react";
 
 export type ChatSummary = { id: string; title: string; created_at: string };

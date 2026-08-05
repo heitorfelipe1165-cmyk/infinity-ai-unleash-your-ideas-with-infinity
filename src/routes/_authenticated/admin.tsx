@@ -174,11 +174,11 @@ function AdminPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             disabled={mutation.isPending}
                             onClick={() =>
-                              mutation.mutate({ requestId: row.id, approve: true })
+                              mutation.mutate({ requestId: row.id, decision: "approve" })
                             }
                             className="glow-ring glow-ring-hover inline-flex items-center gap-1.5 rounded-lg border border-neon/40 bg-background px-3 py-1.5 text-[11px] font-medium disabled:opacity-50"
                           >
@@ -186,8 +186,18 @@ function AdminPage() {
                           </button>
                           <button
                             disabled={mutation.isPending}
+                            onClick={() => mutation.mutate({ requestId: row.id, decision: "vip" })}
+                            className="glow-ring glow-ring-hover inline-flex items-center gap-1.5 rounded-lg border border-violet/60 bg-background px-3 py-1.5 text-[11px] font-medium disabled:opacity-50"
+                            style={{
+                              borderColor: "color-mix(in oklab, var(--violet) 60%, transparent)",
+                            }}
+                          >
+                            <Crown className="h-3.5 w-3.5 text-violet" /> Aprovar Direto (VIP)
+                          </button>
+                          <button
+                            disabled={mutation.isPending}
                             onClick={() =>
-                              mutation.mutate({ requestId: row.id, approve: false })
+                              mutation.mutate({ requestId: row.id, decision: "reject" })
                             }
                             className="glow-ring inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-medium transition-colors hover:border-destructive disabled:opacity-50"
                           >
@@ -195,6 +205,7 @@ function AdminPage() {
                           </button>
                         </div>
                       </td>
+
                     </tr>
                   ))}
                 </tbody>
