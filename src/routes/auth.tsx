@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Infinity as InfinityIcon, Loader2, LockKeyhole, Mail } from "lucide-react";
+import { Infinity as InfinityIcon, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
