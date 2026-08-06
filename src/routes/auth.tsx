@@ -25,18 +25,24 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+type Mode = "signin" | "signup" | "forgot" | "code";
+
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const recoveringRef = useRef(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/chat", replace: true });
+      if (data.session && !recoveringRef.current) navigate({ to: "/chat", replace: true });
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (recoveringRef.current) return;
       if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
         navigate({ to: "/chat", replace: true });
       }
@@ -48,6 +54,36 @@ function AuthPage() {
     event.preventDefault();
     setLoading(true);
     try {
+      if (mode === "forgot") {
+        recoveringRef.current = true;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast.success("Enviamos um código de verificação para o seu e-mail.");
+        setMode("code");
+        return;
+      }
+
+      if (mode === "code") {
+        const { error } = await supabase.auth.verifyOtp({
+          email,
+          token: code.trim(),
+          type: "recovery",
+        });
+        if (error) throw error;
+        const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+        if (updateError) throw updateError;
+        toast.success("Senha redefinida com sucesso! Faça login novamente.");
+        await supabase.auth.signOut();
+        recoveringRef.current = false;
+        setCode("");
+        setNewPassword("");
+        setPassword("");
+        setMode("signin");
+        return;
+      }
+
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -72,6 +108,27 @@ function AuthPage() {
     }
   }
 
+  const titles: Record<Mode, string> = {
+    signin: "Entrar na sua conta",
+    signup: "Criar sua conta",
+    forgot: "Esqueci minha senha",
+    code: "Código de verificação",
+  };
+
+  const subtitles: Record<Mode, string> = {
+    signin: "Use seu e-mail e senha para acessar a Infinity AI.",
+    signup: "Cadastre-se com e-mail e senha para começar.",
+    forgot: "Informe seu e-mail e enviaremos um código de verificação.",
+    code: `Digite o código enviado para ${email || "seu e-mail"} e escolha uma nova senha.`,
+  };
+
+  const submitLabels: Record<Mode, string> = {
+    signin: "Entrar",
+    signup: "Criar conta",
+    forgot: "Enviar código",
+    code: "Redefinir senha",
+  };
+
   return (
     <main className="relative flex min-h-screen items-center justify-center px-4">
       <div className="hero-glow pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-50" />
@@ -82,46 +139,79 @@ function AuthPage() {
           <span className="font-display text-base font-semibold">Infinity AI</span>
         </Link>
 
-        <h1 className="mt-8 text-2xl font-bold">
-          {mode === "signin" ? "Entrar na sua conta" : "Criar sua conta"}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {mode === "signin"
-            ? "Use seu e-mail e senha para acessar a Infinity AI."
-            : "Cadastre-se com e-mail e senha para começar."}
-        </p>
+        <h1 className="mt-8 text-2xl font-bold">{titles[mode]}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{subtitles[mode]}</p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <label className="block">
-            <span className="text-xs font-medium text-muted-foreground">E-mail</span>
-            <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@email.com"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </div>
-          </label>
+          {mode !== "code" && (
+            <label className="block">
+              <span className="text-xs font-medium text-muted-foreground">E-mail</span>
+              <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="voce@email.com"
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+            </label>
+          )}
 
-          <label className="block">
-            <span className="text-xs font-medium text-muted-foreground">Senha</span>
-            <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
-              <LockKeyhole className="h-4 w-4 text-muted-foreground" />
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </div>
-          </label>
+          {(mode === "signin" || mode === "signup") && (
+            <label className="block">
+              <span className="text-xs font-medium text-muted-foreground">Senha</span>
+              <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
+                <LockKeyhole className="h-4 w-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+            </label>
+          )}
+
+          {mode === "code" && (
+            <>
+              <label className="block">
+                <span className="text-xs font-medium text-muted-foreground">Código de verificação</span>
+                <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    inputMode="numeric"
+                    required
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="000000"
+                    className="w-full bg-transparent text-sm tracking-[0.3em] outline-none placeholder:text-muted-foreground"
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-medium text-muted-foreground">Nova senha</span>
+                <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
+                  <LockKeyhole className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  />
+                </div>
+              </label>
+            </>
+          )}
 
           <button
             type="submit"
@@ -129,20 +219,44 @@ function AuthPage() {
             className="glow-ring bg-gradient-neon inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_28px_-6px_var(--violet)] disabled:opacity-60"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {mode === "signin" ? "Entrar" : "Criar conta"}
+            {submitLabels[mode]}
           </button>
         </form>
 
-        <button
-          type="button"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="mt-6 w-full text-center text-xs text-muted-foreground transition-colors hover:text-neon"
-        >
-          {mode === "signin"
-            ? "Não tem conta? Cadastre-se"
-            : "Já possui conta? Faça login"}
-        </button>
+        {mode === "signin" && (
+          <button
+            type="button"
+            onClick={() => setMode("forgot")}
+            className="mt-4 w-full text-center text-xs font-medium text-neon transition-opacity hover:opacity-80"
+          >
+            Esqueci Minha Senha
+          </button>
+        )}
+
+        {(mode === "forgot" || mode === "code") && (
+          <button
+            type="button"
+            onClick={() => {
+              recoveringRef.current = false;
+              setMode(mode === "code" ? "forgot" : "signin");
+            }}
+            className="mt-4 w-full text-center text-xs text-muted-foreground transition-colors hover:text-neon"
+          >
+            {mode === "code" ? "Reenviar para outro e-mail" : "Voltar para o login"}
+          </button>
+        )}
+
+        {(mode === "signin" || mode === "signup") && (
+          <button
+            type="button"
+            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+            className="mt-6 w-full text-center text-xs text-muted-foreground transition-colors hover:text-neon"
+          >
+            {mode === "signin" ? "Não tem conta? Cadastre-se" : "Já possui conta? Faça login"}
+          </button>
+        )}
       </div>
     </main>
   );
 }
+
