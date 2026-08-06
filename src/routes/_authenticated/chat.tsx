@@ -156,6 +156,21 @@ function ChatPage() {
     setSidebarOpen(false);
   }
 
+  async function resetChats() {
+    const userId = account.data?.userId;
+    if (!userId) return;
+    if (!window.confirm("Isso vai apagar todas as suas conversas. Continuar?")) return;
+    const { error: msgError } = await supabase.from("messages").delete().eq("user_id", userId);
+    const { error: chatError } = await supabase.from("chats").delete().eq("user_id", userId);
+    if (msgError || chatError) {
+      toast.error("Não foi possível resetar os chats");
+      return;
+    }
+    setChats([]);
+    newChat();
+    toast.success("Chats resetados. Comece uma nova conversa!");
+  }
+
   async function signOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
@@ -283,6 +298,7 @@ function ChatPage() {
             void loadChats();
           }}
           onSelectChat={openChat}
+          onResetChats={resetChats}
           onSignOut={signOut}
         />
       </div>
