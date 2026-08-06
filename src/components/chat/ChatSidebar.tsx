@@ -8,6 +8,7 @@ import {
   Plus,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
 
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ type Props = {
   onNewChat: () => void;
   onOpenHistory: () => void;
   onSelectChat: (id: string) => void;
+  onResetChats: () => void;
   onSignOut: () => void;
 };
 
@@ -34,6 +36,7 @@ export function ChatSidebar({
   onNewChat,
   onOpenHistory,
   onSelectChat,
+  onResetChats,
   onSignOut,
 }: Props) {
   return (
@@ -56,6 +59,13 @@ export function ChatSidebar({
           className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-sidebar-border bg-surface px-4 py-2.5 text-sm font-medium"
         >
           <Folder className="h-4 w-4 text-neon" /> Chats
+        </button>
+
+        <button
+          onClick={onResetChats}
+          className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-destructive/40 bg-surface px-4 py-2.5 text-sm font-medium text-destructive"
+        >
+          <Trash2 className="h-4 w-4" /> Resetar Chats
         </button>
       </div>
 
