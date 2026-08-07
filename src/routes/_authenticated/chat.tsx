@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Menu, Paperclip, SendHorizonal, X } from "lucide-react";
+import { AccountLoadingScreen } from "@/components/AccountLoadingScreen";
 import { InfinityLogo } from "@/components/InfinityLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { getAccountState } from "@/lib/app.functions";
@@ -58,9 +59,10 @@ function ChatPage() {
     queryKey: ["account"],
     queryFn: () => fetchAccount({ data: undefined }),
   });
+  const isLoading = account.isPending || account.isFetching;
 
   useEffect(() => {
-    if (!account.data) return;
+    if (isLoading || !account.data) return;
     if (account.data.isBanned) {
       toast.error("Sua conta foi suspensa");
       void (async () => {
@@ -79,7 +81,7 @@ function ChatPage() {
       );
       navigate({ to: "/paywall", replace: true });
     }
-  }, [account.data, navigate, queryClient]);
+  }, [account.data, isLoading, navigate, queryClient]);
 
   // Mantém o acesso sincronizado em tempo real (aprovação, liberação, banimento).
   useEffect(() => {
@@ -96,7 +98,6 @@ function ChatPage() {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
-
 
   const loadChats = useCallback(async () => {
     const { data } = await supabase
@@ -277,12 +278,8 @@ function ChatPage() {
     [messages],
   );
 
-  if (account.isLoading || !account.data) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-neon" />
-      </div>
-    );
+  if (isLoading || !account.data) {
+    return <AccountLoadingScreen />;
   }
 
   return (
@@ -348,7 +345,9 @@ function ChatPage() {
           <div className="scrollbar-slim relative flex-1 overflow-y-auto px-4 py-6">
             <div className="mx-auto max-w-3xl space-y-2">
               {chats.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Você ainda não tem conversas salvas.</p>
+                <p className="text-sm text-muted-foreground">
+                  Você ainda não tem conversas salvas.
+                </p>
               ) : (
                 chats.map((chat) => (
                   <button
@@ -473,6 +472,7 @@ function ChatPage() {
                 }
               }}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   void send(input);
