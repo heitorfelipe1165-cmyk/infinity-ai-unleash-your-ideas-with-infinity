@@ -83,17 +83,32 @@ export const getAccountState = createServerFn({ method: "POST" })
 
     const { data: lastRequest } = await supabaseAdmin
       .from("subscriptions")
-      .select("status, name")
+      .select("status, name, plan")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     const requestStatus = lastRequest?.status ?? null;
+    const plan = lastRequest?.plan ?? null;
     if (!fullName && lastRequest?.name) fullName = lastRequest.name;
 
     const isBanned =
       !isAdmin && (subscriptionStatus === "banned" || requestStatus === "banned");
+
+    // Contagem de mensagens do dia — usada para o limite do plano grátis.
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const { count } = await supabaseAdmin
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("role", "user")
+      .gte("created_at", startOfDay.toISOString());
+
+    const usedToday = count ?? 0;
+    const isFree = plan === "free";
+    const freeLimitReached = !isAdmin && isFree && usedToday >= FREE_DAILY_LIMIT;
 
     return {
       userId,
@@ -102,11 +117,50 @@ export const getAccountState = createServerFn({ method: "POST" })
       isAdmin,
       subscriptionStatus,
       requestStatus,
+      plan,
       isBanned,
+      usedToday,
+      freeLimit: FREE_DAILY_LIMIT,
+      freeLimitReached,
       pixUnlocked: !isAdmin && !isBanned && requestStatus === "approved",
-      hasAccess: isAdmin || (!isBanned && requestStatus === "finalized"),
+      hasAccess:
+        isAdmin || (!isBanned && requestStatus === "finalized" && !freeLimitReached),
     };
   });
+
+/** Ativa o plano grátis: acesso imediato ao chat com limite diário de mensagens. */
+export const startFreePlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const userId = context.userId;
+    const email = String((context.claims as { email?: string }).email ?? "").toLowerCase();
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name, subscription_status")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profile?.subscription_status === "banned") throw new Error("Sua conta foi suspensa");
+
+    const { error } = await supabaseAdmin.from("subscriptions").insert({
+      user_id: userId,
+      email,
+      name: profile?.full_name ?? email,
+      plan: "free",
+      status: "finalized",
+    });
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({ subscription_status: "active" })
+      .eq("id", userId);
+
+    return { ok: true };
+  });
+
 
 /** O cliente confirma que já realizou o PIX, liberando o chat. */
 export const finalizePayment = createServerFn({ method: "POST" })
