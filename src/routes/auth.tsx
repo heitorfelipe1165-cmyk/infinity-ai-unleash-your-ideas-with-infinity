@@ -1,8 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Infinity as InfinityIcon, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { BrandMark } from "@/components/InfinityLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { OWNER_EMAIL } from "@/lib/plans.owner";
+import { rememberPassword } from "@/lib/password-vault";
 
 
 export const Route = createFileRoute("/auth")({
@@ -22,6 +26,9 @@ export const Route = createFileRoute("/auth")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    mode: search["mode"] === "signup" ? ("signup" as const) : undefined,
+  }),
   component: AuthPage,
 });
 
@@ -29,7 +36,9 @@ type Mode = "signin" | "signup" | "forgot" | "code";
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>("signin");
+  const { mode: initialMode } = Route.useSearch();
+  const [mode, setMode] = useState<Mode>(initialMode === "signup" ? "signup" : "signin");
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -85,6 +94,11 @@ function AuthPage() {
       }
 
       if (mode === "signup") {
+        if (email.trim().toLowerCase() === OWNER_EMAIL) {
+          throw new Error(
+            "Esta conta de administrador já existe. Use apenas o login com e-mail e senha.",
+          );
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -95,10 +109,12 @@ function AuthPage() {
           toast.success("Conta criada! Confirme seu e-mail para acessar.");
           return;
         }
+        rememberPassword(email, password);
         toast.success("Conta criada com sucesso!");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        rememberPassword(email, password);
         toast.success("Bem-vindo de volta!");
       }
     } catch (error) {
@@ -134,10 +150,10 @@ function AuthPage() {
       <div className="hero-glow pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-50" />
 
       <div className="surface-panel glow-ring relative w-full max-w-md rounded-3xl p-8 shadow-[0_0_50px_-20px_var(--violet)]">
-        <Link to="/" className="flex items-center gap-2">
-          <InfinityIcon className="h-6 w-6 text-neon" />
-          <span className="font-display text-base font-semibold">Infinity AI</span>
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <BrandMark to="/" />
+          <ThemeToggle />
+        </div>
 
         <h1 className="mt-8 text-2xl font-bold">{titles[mode]}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{subtitles[mode]}</p>
@@ -166,7 +182,7 @@ function AuthPage() {
               <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
                 <LockKeyhole className="h-4 w-4 text-muted-foreground" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   minLength={6}
                   value={password}
@@ -174,6 +190,14 @@ function AuthPage() {
                   placeholder="••••••••"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Ocultar senha" : "Revelar senha"}
+                  className="text-muted-foreground transition-colors hover:text-neon"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </label>
           )}
