@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { FREE_DAILY_LIMIT } from "@/lib/plans";
 
 export const OWNER_EMAIL = "heitorfelipe1165@gmail.com";
 
@@ -12,12 +13,20 @@ export type AccountState = {
   subscriptionStatus: string;
   /** Status da última solicitação: null | pending | approved | rejected | finalized | banned */
   requestStatus: string | null;
+  /** Plano da última solicitação: null | free | pro | infinite */
+  plan: string | null;
   /** Conta suspensa pelo administrador */
   isBanned: boolean;
   /** Chave PIX liberada para exibição (aprovado, aguardando confirmação do pagamento) */
   pixUnlocked: boolean;
+  /** Mensagens enviadas hoje (usado no plano grátis) */
+  usedToday: number;
+  freeLimit: number;
+  /** Plano grátis atingiu o limite diário de mensagens */
+  freeLimitReached: boolean;
   hasAccess: boolean;
 };
+
 
 
 /**
