@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Menu, Paperclip, SendHorizonal, Sparkles, X } from "lucide-react";
+import { Loader2, Menu, Paperclip, SendHorizonal, X } from "lucide-react";
+import { InfinityLogo } from "@/components/InfinityLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { getAccountState } from "@/lib/app.functions";
 import { ChatSidebar, type ChatSummary } from "@/components/chat/ChatSidebar";
@@ -72,7 +73,9 @@ function ChatPage() {
     }
     if (!account.data.hasAccess) {
       toast.error(
-        "Acesso bloqueado. O chat só será desbloqueado após a realização do PIX e confirmação do envio.",
+        account.data.freeLimitReached
+          ? "Limite diário atingido. Faça o PIX para liberar mais acesso."
+          : "Acesso bloqueado. O chat só será desbloqueado após a realização do PIX e confirmação do envio.",
       );
       navigate({ to: "/paywall", replace: true });
     }
@@ -254,6 +257,8 @@ function ChatPage() {
         setMessages([...history, { role: "assistant", content: answer }]);
       }
 
+      queryClient.invalidateQueries({ queryKey: ["account"] });
+
       if (answer.trim()) {
         await supabase
           .from("messages")
@@ -281,7 +286,13 @@ function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-[100dvh] overflow-hidden">
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-background/70 backdrop-blur-sm md:hidden"
+        />
+      )}
       <div
         className={`${sidebarOpen ? "fixed inset-y-0 left-0 z-40 w-72" : "hidden"} md:relative md:block`}
       >
@@ -289,7 +300,13 @@ function ChatPage() {
           chats={chats}
           activeChatId={activeChatId}
           isAdmin={account.data.isAdmin}
-            showPix={account.data.pixUnlocked}
+          showPix={account.data.pixUnlocked}
+          plan={account.data.plan}
+          usage={
+            account.data.plan === "free" && !account.data.isAdmin
+              ? { used: account.data.usedToday, limit: account.data.freeLimit }
+              : null
+          }
           email={account.data.email}
           onNewChat={newChat}
           onOpenHistory={() => {
@@ -318,7 +335,11 @@ function ChatPage() {
               {showHistory ? "Histórico de conversas" : "Infinity AI"}
             </h1>
             <p className="text-[11px] text-muted-foreground">
-              {account.data.isAdmin ? "Dono / Administrador" : "Assinatura ativa"}
+              {account.data.isAdmin
+                ? "Dono / Administrador"
+                : account.data.plan === "free"
+                  ? `Plano grátis • ${account.data.usedToday}/${account.data.freeLimit} mensagens hoje`
+                  : "Assinatura ativa"}
             </p>
           </div>
         </header>
@@ -349,7 +370,7 @@ function ChatPage() {
             <div className="mx-auto max-w-3xl space-y-6">
               {messages.length === 0 ? (
                 <div className="pt-10 text-center">
-                  <Sparkles className="mx-auto h-8 w-8 text-neon" />
+                  <InfinityLogo className="mx-auto h-10 w-16 text-neon" />
                   <h2 className="mt-4 text-2xl font-bold">
                     Como posso <span className="text-gradient-neon">acelerar</span> seu dia?
                   </h2>
