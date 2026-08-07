@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import {
+  Eye,
+  EyeOff,
   Folder,
-  Infinity as InfinityIcon,
   KeyRound,
   LogOut,
   MessageSquare,
@@ -9,8 +10,13 @@ import {
   ShieldAlert,
   ShieldCheck,
   Trash2,
-
 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { BrandMark } from "@/components/InfinityLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { revealPassword } from "@/lib/password-vault";
+import { planLabel } from "@/lib/plans";
 
 export type ChatSummary = { id: string; title: string; created_at: string };
 
@@ -20,6 +26,8 @@ type Props = {
   isAdmin: boolean;
   showPix?: boolean;
   email: string;
+  plan?: string | null;
+  usage?: { used: number; limit: number } | null;
   onNewChat: () => void;
   onOpenHistory: () => void;
   onSelectChat: (id: string) => void;
@@ -33,17 +41,34 @@ export function ChatSidebar({
   isAdmin,
   showPix = false,
   email,
+  plan = null,
+  usage = null,
   onNewChat,
   onOpenHistory,
   onSelectChat,
   onResetChats,
   onSignOut,
 }: Props) {
+  const [password, setPassword] = useState<string | null>(null);
+
+  function toggleReveal() {
+    if (password) {
+      setPassword(null);
+      return;
+    }
+    const saved = revealPassword(email);
+    if (!saved) {
+      toast.error("Senha não disponível neste navegador. Faça login novamente para salvá-la.");
+      return;
+    }
+    setPassword(saved);
+  }
+
   return (
     <aside className="flex h-full w-full flex-col border-r border-sidebar-border bg-sidebar md:w-72">
-      <div className="flex items-center gap-2 px-4 py-4">
-        <InfinityIcon className="h-6 w-6 text-neon" />
-        <span className="font-display text-base font-semibold">Infinity AI</span>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-4">
+        <BrandMark to="/" />
+        <ThemeToggle />
       </div>
 
       <div className="space-y-2 px-3">
@@ -126,7 +151,32 @@ export function ChatSidebar({
           </Link>
         )}
 
-        <p className="truncate px-1 text-[11px] text-muted-foreground">{email}</p>
+        <button
+          onClick={toggleReveal}
+          className="glow-ring glow-ring-hover flex w-full items-center gap-2 rounded-xl border border-sidebar-border bg-surface px-4 py-2.5 text-sm font-medium"
+        >
+          {password ? <EyeOff className="h-4 w-4 text-neon" /> : <Eye className="h-4 w-4 text-neon" />}
+          {password ? "Ocultar Senha" : "Revelar Senha"}
+        </button>
+        {password && (
+          <p className="break-all rounded-lg border border-border bg-background px-3 py-2 font-mono text-[11px] text-neon">
+            {password}
+          </p>
+        )}
+
+        <div className="px-1">
+          <p className="truncate text-[11px] text-muted-foreground">{email}</p>
+          {plan && (
+            <p className="text-[11px] text-muted-foreground">
+              Plano: <span className="text-neon">{planLabel[plan] ?? plan}</span>
+            </p>
+          )}
+          {usage && (
+            <p className="text-[11px] text-muted-foreground">
+              {usage.used}/{usage.limit} mensagens hoje
+            </p>
+          )}
+        </div>
 
         <button
           onClick={onSignOut}
