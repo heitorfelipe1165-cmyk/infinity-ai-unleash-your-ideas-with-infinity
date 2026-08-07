@@ -7,6 +7,12 @@ export type PlanId = "free" | "pro" | "infinite";
 
 export const FREE_DAILY_LIMIT = 10;
 
+const ACCESS_STATUSES = new Set(["active", "finalized"]);
+
+export function isAccessStatus(status: string | null | undefined): boolean {
+  return typeof status === "string" && ACCESS_STATUSES.has(status.toLowerCase());
+}
+
 export const PIX_KEYS: Record<Exclude<PlanId, "free">, string> = {
   pro: "00020126580014br.gov.bcb.pix013633366dfb-6a77-4aae-af7d-1341bbd7c111520400005303986540530.005802BR5925CAIO EMANUEL SILVA WERNES6010Vila Velha6211050726f787963047EAE",
   infinite:

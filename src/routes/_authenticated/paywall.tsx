@@ -12,6 +12,7 @@ import {
   startFreePlan,
 } from "@/lib/app.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { AccountLoadingScreen } from "@/components/AccountLoadingScreen";
 import { BrandMark } from "@/components/InfinityLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { FREE_DAILY_LIMIT, PLANS, pixKeyFor, planLabel, priceFor, type PlanId } from "@/lib/plans";
@@ -54,6 +55,7 @@ function Paywall() {
     queryKey: ["account"],
     queryFn: () => fetchAccount({ data: undefined }),
   });
+  const isLoading = account.isPending || account.isFetching;
 
   const requestStatus = account.data?.requestStatus ?? null;
   const pixUnlocked = account.data?.pixUnlocked ?? false;
@@ -64,17 +66,21 @@ function Paywall() {
 
   // Administradores vão direto ao chat.
   useEffect(() => {
-    if (account.data?.isAdmin) navigate({ to: "/chat", replace: true });
-  }, [account.data?.isAdmin, navigate]);
+    if (isLoading || !account.data) return;
+    if (account.data.isAdmin) navigate({ to: "/chat", replace: true });
+  }, [account.data, isLoading, navigate]);
 
   // Já liberou o chat: segue direto para a conversa.
   useEffect(() => {
-    if (account.data?.hasAccess && !account.data.isAdmin) navigate({ to: "/chat", replace: true });
-  }, [account.data?.hasAccess, account.data?.isAdmin, navigate]);
+    if (isLoading || !account.data) return;
+    if (account.data.hasAccess && !account.data.isAdmin) {
+      navigate({ to: "/chat", replace: true });
+    }
+  }, [account.data, isLoading, navigate]);
 
   // Conta suspensa: desloga na hora.
   useEffect(() => {
-    if (!banned) return;
+    if (isLoading || !banned) return;
     toast.error("Sua conta foi suspensa");
     void (async () => {
       await queryClient.cancelQueries();
@@ -82,7 +88,7 @@ function Paywall() {
       await supabase.auth.signOut();
       navigate({ to: "/auth", replace: true });
     })();
-  }, [banned, navigate, queryClient]);
+  }, [banned, isLoading, navigate, queryClient]);
 
   // Atualiza a tela assim que o administrador aprovar a solicitação.
   useEffect(() => {
@@ -160,6 +166,10 @@ function Paywall() {
   const waiting = !pixUnlocked && (sent || requestStatus === "pending");
   const paidPlans = PLANS.filter((p) => p.id !== "free" || !limitReached);
 
+  if (isLoading || !account.data) {
+    return <AccountLoadingScreen />;
+  }
+
   return (
     <main className="relative min-h-[100dvh] px-4 py-10">
       <div className="hero-glow pointer-events-none absolute inset-x-0 top-0 h-[460px] opacity-50" />
@@ -192,8 +202,8 @@ function Paywall() {
             </span>
             <h1 className="mt-6 text-2xl font-bold">Solicitação aprovada!</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Pague {priceFor(plan ?? "pro")} com a chave PIX abaixo e depois clique em “Já fiz o PIX
-              - Liberar Chat”.
+              Pague {priceFor(plan ?? "pro")} com a chave PIX abaixo e depois clique em “Já fiz o
+              PIX - Liberar Chat”.
             </p>
 
             <p className="mt-6 text-xs font-medium text-muted-foreground">

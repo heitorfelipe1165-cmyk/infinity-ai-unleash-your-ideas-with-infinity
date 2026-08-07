@@ -1,7 +1,8 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { FREE_DAILY_LIMIT } from "@/lib/plans";
+import { FREE_DAILY_LIMIT, isAccessStatus } from "@/lib/plans";
 
 export const OWNER_EMAIL = "heitorfelipe1165@gmail.com";
 
@@ -26,8 +27,6 @@ export type AccountState = {
   freeLimitReached: boolean;
   hasAccess: boolean;
 };
-
-
 
 /**
  * Garante que o perfil exista, aplica o cargo de Dono/Administrador ao e-mail
@@ -93,8 +92,7 @@ export const getAccountState = createServerFn({ method: "POST" })
     const plan = lastRequest?.plan ?? null;
     if (!fullName && lastRequest?.name) fullName = lastRequest.name;
 
-    const isBanned =
-      !isAdmin && (subscriptionStatus === "banned" || requestStatus === "banned");
+    const isBanned = !isAdmin && (subscriptionStatus === "banned" || requestStatus === "banned");
 
     // Contagem de mensagens do dia — usada para o limite do plano grátis.
     const startOfDay = new Date();
@@ -124,7 +122,10 @@ export const getAccountState = createServerFn({ method: "POST" })
       freeLimitReached,
       pixUnlocked: !isAdmin && !isBanned && requestStatus === "approved",
       hasAccess:
-        isAdmin || (!isBanned && requestStatus === "finalized" && !freeLimitReached),
+        isAdmin ||
+        (!isBanned &&
+          (isAccessStatus(subscriptionStatus) || isAccessStatus(requestStatus)) &&
+          !freeLimitReached),
     };
   });
 
@@ -153,14 +154,10 @@ export const startFreePlan = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
-    await supabaseAdmin
-      .from("profiles")
-      .update({ subscription_status: "active" })
-      .eq("id", userId);
+    await supabaseAdmin.from("profiles").update({ subscription_status: "active" }).eq("id", userId);
 
     return { ok: true };
   });
-
 
 /** O cliente confirma que já realizou o PIX, liberando o chat. */
 export const finalizePayment = createServerFn({ method: "POST" })
@@ -188,7 +185,6 @@ export const finalizePayment = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
-
 
 export const createPaymentRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -241,13 +237,11 @@ export const listPaymentRequests = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!adminRole) throw new Error("Acesso restrito ao administrador");
 
-
     const { data: requests, error } = await context.supabase
       .from("subscriptions")
       .select("id, user_id, name, email, status, plan, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-
 
     const { data: profiles } = await context.supabase
       .from("profiles")
@@ -262,9 +256,7 @@ export const listPaymentRequests = createServerFn({ method: "POST" })
     }));
   });
 
-async function assertAdmin(supabase: {
-  from: (t: string) => any;
-}, userId: string) {
+async function assertAdmin(supabase: SupabaseClient, userId: string) {
   const { data: adminRole } = await supabase
     .from("user_roles")
     .select("role")
@@ -295,11 +287,7 @@ export const decidePaymentRequest = createServerFn({ method: "POST" })
     if (error || !request) throw new Error("Solicitação não encontrada");
 
     const status =
-      data.decision === "approve"
-        ? "approved"
-        : data.decision === "vip"
-          ? "finalized"
-          : "rejected";
+      data.decision === "approve" ? "approved" : data.decision === "vip" ? "finalized" : "rejected";
 
     await context.supabase.from("subscriptions").update({ status }).eq("id", request.id);
     await context.supabase
@@ -395,7 +383,5 @@ export const setUserBanState = createServerFn({ method: "POST" })
       });
     }
 
-
     return { ok: true };
   });
-

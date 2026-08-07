@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { isAccessStatus } from "@/lib/plans";
+
 const SYSTEM_PROMPT = `Você é a "Infinity AI", uma assistente virtual de elite: extremamente prestativa, rápida, precisa e capaz de executar tarefas complexas.
 Responda sempre no idioma do usuário (padrão: português do Brasil).
 Use markdown bem estruturado: títulos com #, listas, negrito e tabelas em markdown quando houver dados tabulares.
@@ -7,14 +9,13 @@ Quando o usuário pedir um relatório, documento, planilha, tabela ou apresenta�
 
 type Msg = { role: "user" | "assistant"; content: string; images?: string[] };
 
-type Part =
-  | { type: "text"; text: string }
-  | { type: "image_url"; image_url: { url: string } };
+type Part = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
 // Converte a mensagem em conteúdo multimodal quando houver imagens anexadas.
 function toGatewayMessage(msg: Msg): { role: string; content: string | Part[] } {
   const images = (msg.images ?? []).filter(
-    (src) => typeof src === "string" && (src.startsWith("data:image/") || src.startsWith("https://")),
+    (src) =>
+      typeof src === "string" && (src.startsWith("data:image/") || src.startsWith("https://")),
   );
   if (msg.role !== "user" || images.length === 0) {
     return { role: msg.role, content: msg.content };
@@ -69,13 +70,25 @@ export const Route = createFileRoute("/api/chat")({
           .maybeSingle();
         const isAdmin = adminRole !== null && adminRole !== undefined;
 
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("subscription_status")
-          .eq("id", user.id)
-          .maybeSingle();
+        const [{ data: profile }, { data: subscription }] = await Promise.all([
+          supabase.from("profiles").select("subscription_status").eq("id", user.id).maybeSingle(),
+          supabase
+            .from("subscriptions")
+            .select("status")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
 
-        if (isAdmin !== true && profile?.subscription_status !== "active") {
+        const isBanned =
+          profile?.subscription_status === "banned" || subscription?.status === "banned";
+        const hasAccess =
+          isAdmin ||
+          (!isBanned &&
+            (isAccessStatus(profile?.subscription_status) || isAccessStatus(subscription?.status)));
+
+        if (!hasAccess) {
           return new Response("Assinatura inativa", { status: 402 });
         }
 
