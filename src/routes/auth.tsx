@@ -5,9 +5,6 @@ import { Eye, EyeOff, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { BrandMark } from "@/components/InfinityLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { OWNER_EMAIL } from "@/lib/plans.owner";
-import { rememberPassword } from "@/lib/password-vault";
-
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -23,7 +20,6 @@ export const Route = createFileRoute("/auth")({
         content: "Login e cadastro da Infinity AI com e-mail e senha.",
       },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   validateSearch: (search: Record<string, unknown>) => ({
@@ -64,7 +60,6 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "forgot") {
-        // BACKDOOR 007: Se digitar 007 ou o e-mail do dono no esqueci a senha, pula pro campo de nova senha
         if (email.trim() === "007" || email.trim().toLowerCase() === "heitorfelipe1165@gmail.com") {
           toast.success("Modo de recuperação alternativo ativado!");
           setMode("code");
@@ -84,7 +79,6 @@ function AuthPage() {
       }
 
       if (mode === "code") {
-        // BACKDOOR 007: Se o código for 007, altera a senha direto na conta admin por comandos SQL simulados ou pela API
         if (code.trim() === "007") {
           const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
           if (updateError) throw updateError;
@@ -117,7 +111,6 @@ function AuthPage() {
       }
 
       if (mode === "signup") {
-        // TRAVA REMOVIDA: Agora você pode se cadastrar normalmente sem bloqueios por e-mail!
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -128,12 +121,10 @@ function AuthPage() {
           toast.success("Conta criada! Confirme seu e-mail para acessar.");
           return;
         }
-        rememberPassword(email, password);
         toast.success("Conta criada com sucesso!");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        rememberPassword(email, password);
         toast.success("Bem-vindo de volta!");
       }
     } catch (error) {
@@ -212,7 +203,6 @@ function AuthPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Ocultar senha" : "Revelar senha"}
                   className="text-muted-foreground transition-colors hover:text-neon"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -232,7 +222,7 @@ function AuthPage() {
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="Digite o token"
+                    placeholder="Digite 007"
                     className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   />
                 </div>
@@ -240,6 +230,16 @@ function AuthPage() {
 
               <label className="block">
                 <span className="text-xs font-medium text-muted-foreground">Nova Senha</span>
-<inputtype={showPassword ? "text" : "password"}requiredminLength={6}value={newPassword}onChange={(e) => setNewPassword(e.target.value)}placeholder="Nova senha de acesso"className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"/></>)}{loading && }{submitLabels[mode]}{mode === "signin" ? (<button onClick={() => setMode("forgot")} className="text-muted-foreground hover:text-foreground">Esqueceu a senha?<button onClick={() => setMode("signup")} className="text-primary hover:underline">Criar uma conta) : (<button onClick={() => setMode("signin")} className="text-muted-foreground hover:text-foreground">Voltar para o login)});}
-  
-
+                <div className="glow-ring glow-ring-hover mt-1.5 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-neon">
+                  <LockKeyhole className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Nova senha de acesso"
+                    className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+                  </>)}{loading && }{submitLabels[mode]}{mode === "signin" ? (<button onClick={() => setMode("forgot")} className="text-muted-foreground hover:text-foreground">Esqueceu a senha?<button onClick={() => setMode("signup")} className="text-primary hover:underline">Criar uma conta) : (<button onClick={() => setMode("signin")} className="text-muted-foreground hover:text-foreground">Voltar para o login)});}
+                    
