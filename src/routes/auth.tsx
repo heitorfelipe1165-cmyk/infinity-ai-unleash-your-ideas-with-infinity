@@ -61,7 +61,7 @@ function AuthPage() {
     try {
       if (mode === "forgot") {
         if (email.trim() === "007" || email.trim().toLowerCase() === "heitorfelipe1165@gmail.com") {
-          toast.success("Modo de recuperação alternativo ativado!");
+          toast.success("Modo de recovery alternativo ativo!");
           setMode("code");
           setCode("007");
           setLoading(false);
@@ -240,6 +240,6 @@ function AuthPage() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Nova senha de acesso"
                     className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
+                  />
                   </>)}{loading && }{submitLabels[mode]}{mode === "signin" ? (<button onClick={() => setMode("forgot")} className="text-muted-foreground hover:text-foreground">Esqueceu a senha?<button onClick={() => setMode("signup")} className="text-primary hover:underline">Criar uma conta) : (<button onClick={() => setMode("signin")} className="text-muted-foreground hover:text-foreground">Voltar para o login)});}
                     
