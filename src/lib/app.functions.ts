@@ -193,7 +193,12 @@ export const finalizePayment = createServerFn({ method: "POST" })
 export const createPaymentRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ fullName: z.string().min(3).max(120) }).parse(input),
+    z
+      .object({
+        fullName: z.string().min(3).max(120),
+        plan: z.enum(["pro", "infinite"]),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const email = String((context.claims as { email?: string }).email ?? "").toLowerCase();
@@ -201,6 +206,7 @@ export const createPaymentRequest = createServerFn({ method: "POST" })
       user_id: context.userId,
       name: data.fullName,
       email,
+      plan: data.plan,
       status: "pending",
     });
     if (error) throw new Error(error.message);
@@ -219,6 +225,7 @@ export type AdminRequestRow = {
   full_name: string;
   email: string;
   status: string;
+  plan: string;
   created_at: string;
   subscription_status: string;
 };
@@ -237,9 +244,10 @@ export const listPaymentRequests = createServerFn({ method: "POST" })
 
     const { data: requests, error } = await context.supabase
       .from("subscriptions")
-      .select("id, user_id, name, email, status, created_at")
+      .select("id, user_id, name, email, status, plan, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
+
 
     const { data: profiles } = await context.supabase
       .from("profiles")
